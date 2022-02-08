@@ -1,5 +1,6 @@
 ﻿#include "../plugin_sdk/plugin_sdk.hpp"
 #include "KoreanPings.h"
+#include "PingPackage.h";
 
 #include <iostream>
 #include<chrono>
@@ -8,10 +9,12 @@
 namespace koreanPings
 {
 
-    int pingSended = 0;
+    std::vector<PingPackage> pingPackagesVector;
 
     std::set<std::uint32_t>invisibleChampions;
     std::set<std::uint32_t>::iterator iterator;
+
+    uint16_t availablePings;
 
     TreeTab* mainTab = nullptr;
     TreeTab* pingsSettingsTab = nullptr;
@@ -24,42 +27,59 @@ namespace koreanPings
         std::map<std::uint32_t, TreeEntry*> pingMoveOutFog;
     }
 
-    std::chrono::time_point<std::chrono::system_clock> start, end;
+    std::chrono::time_point<std::chrono::system_clock> newPingStartTimer, delayStartTimer, currentTimer;
 
+    void checkNewPingAvailable() {
 
-    bool checkCanCastPing() {
+        currentTimer = std::chrono::system_clock::now();
 
-        end = std::chrono::system_clock::now();
-
-        std::chrono::duration<double> elapsed_seconds = end - start;
+        std::chrono::duration<double> elapsed_seconds = currentTimer - newPingStartTimer;
         auto x = std::chrono::duration_cast<std::chrono::seconds>(elapsed_seconds);
-        
-        std::string result = std::to_string(x.count());
-        const char* chr = result.c_str();
 
-        return x.count() > 5;
-    }
-
-    void castLimitedPing(vector poistion, int incresePingBy, _player_ping_type pingType) {
-
-        if (checkCanCastPing()) {
-            if (pingSended % 10 == 0 && pingSended <= 50) {
-                myhero->cast_ping(poistion, nullptr, pingType);
+        if(x.count() >= 1){
+            if (availablePings < 6) {
+                availablePings++;
             }
 
-            if (pingSended == 50) {
-                pingSended = 0;
-                start = std::chrono::system_clock::now();
-            }
-
-            pingSended += incresePingBy;
+            newPingStartTimer = std::chrono::system_clock::now();
         }
     }
 
+    bool checkCanCastPingDelay(uint16_t timerDelayMs) {
+
+        currentTimer = std::chrono::system_clock::now();
+
+        std::chrono::duration<double> elapsed_seconds = currentTimer - delayStartTimer;
+        auto x = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_seconds);
+
+        return x.count() > timerDelayMs;
+    }
+
+    void castLimitedPing() {
+
+        PingPackage &firstPing = pingPackagesVector.front();
+
+        if (availablePings > 0) {
+
+            if (checkCanCastPingDelay(firstPing.getTimerDelayMs())) {
+                myhero->cast_ping(firstPing.getPosition(), nullptr, firstPing.getPingType());
+                firstPing.setPingsCount(firstPing.getPingsCount() - 1);
+                delayStartTimer = std::chrono::system_clock::now();
+            }
+
+            if (firstPing.getPingsCount() == 0) {
+                pingPackagesVector.erase(pingPackagesVector.begin());
+            }
+        }
+    }
+
+    //TODO handle range to enemy
     void load()
     {
-        
-        start = std::chrono::system_clock::now();
+        availablePings = 6;
+        newPingStartTimer = std::chrono::system_clock::now();
+        delayStartTimer = std::chrono::system_clock::now();
+
         mainTab = menu->create_tab("koreanPings", "KoreanPings");
         pingsSettingsTab = mainTab->add_tab("pingSettings", "Ping settings");
 
@@ -99,17 +119,16 @@ namespace koreanPings
     void on_create_object(game_object_script sender)
     {
         if (sender->is_ward() && sender->is_enemy()) {
-            castLimitedPing(sender->get_position(), 10, _player_ping_type::area_is_warded);
+            //castLimitedPing(sender->get_position(), _player_ping_type::area_is_warded);
         }
     }
 
     void on_update()
     {
-        //if (orbwalker->combo_mode()) {
-        //    vector my_position = myhero->get_position();
-        //    vector vectorToPing = vector(my_position.x + pingSended, my_position.y + pingSended, my_position.z);
-        //    castLimitedPing(vectorToPing, 1);
-        //}
+        if (!pingPackagesVector.empty()) {
+            castLimitedPing();
+            checkNewPingAvailable();
+        }
 
         auto enemies = entitylist->get_enemy_heroes();
 
@@ -125,7 +144,11 @@ namespace koreanPings
                 else {
                     iterator = invisibleChampions.find(enemyId);
                     if (iterator != invisibleChampions.end()) {
-                        castLimitedPing(enemy->get_position(), 10, _player_ping_type::danger);
+                        delayStartTimer = std::chrono::system_clock::now();
+
+                        PingPackage pingPackage = PingPackage(enemy->get_position(), 1, 400, _player_ping_type::danger);
+                        pingPackagesVector.push_back(pingPackage);
+
                         invisibleChampions.erase(iterator);
                     }
                 }

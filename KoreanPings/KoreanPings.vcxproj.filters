@@ -39,5 +39,6 @@
     <ClInclude Include="KoreanPings.h">
       <Filter>src\KoreanPings</Filter>
     </ClInclude>
+    <ClInclude Include="PingPackage.h" />
   </ItemGroup>
 </Project>
