@@ -10,10 +10,9 @@ private:
 	_player_ping_type pingType;
 
 public:
-	PingPackage(vector position, uint8_t pingsCount, uint16_t timerDelayMs, _player_ping_type pingType) {
+	PingPackage(vector position, uint8_t pingsCount, _player_ping_type pingType) {
 		this->position = position;
 		this->pingsCount = pingsCount;
-		this->timerDelayMs = timerDelayMs;
 		this->pingType = pingType;
 	}
 
