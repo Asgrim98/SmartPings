@@ -6,7 +6,6 @@ class PingPackage
 private:
 	vector position;
 	uint8_t pingsCount;
-	uint16_t timerDelayMs;
 	_player_ping_type pingType;
 
 public:
@@ -22,10 +21,6 @@ public:
 
 	uint8_t getPingsCount() {
 		return this->pingsCount;
-	}
-
-	uint8_t getTimerDelayMs() {
-		return this->timerDelayMs;
 	}
 
 	_player_ping_type getPingType() {

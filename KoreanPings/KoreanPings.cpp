@@ -1,6 +1,7 @@
 ﻿#include "../plugin_sdk/plugin_sdk.hpp"
 #include "KoreanPings.h"
 #include "PingPackage.h";
+#include "WardsNotifier.h";
 
 #include <iostream>
 #include<chrono>
@@ -14,6 +15,8 @@ namespace koreanPings
 {
     std::vector<PingPackage> pingPackagesVector;
     std::vector<game_object_script> objectVector;
+
+    std::map<std::uint32_t, std::vector<game_object_script>> wardNotifier;
 
     std::set<std::uint32_t>invisibleChampions;
     std::set<std::uint32_t>::iterator iterator;
@@ -32,7 +35,7 @@ namespace koreanPings
         std::map<std::uint32_t, TreeEntry*> pingAllyNearWard;
     }
 
-    float newPingStartTimer, delayStartTimer, currentTimer;
+    float mainTimer, newPingStartTimer, delayStartTimer, currentTimer;
 
     void checkNewPingAvailable() {
 
@@ -72,12 +75,10 @@ namespace koreanPings
                 firstPing.setPingsCount(firstPing.getPingsCount() - 1);
                 delayStartTimer = gametime->get_time();
 
-                if (firstPing.getPingsCount() == 0) {
+                if (firstPing.getPingsCount() <= 0) {
                     pingPackagesVector.erase(pingPackagesVector.begin());
                 }
             }
-
-            
         }
     }
 
@@ -87,6 +88,7 @@ namespace koreanPings
         availablePings = 6;
         newPingStartTimer = gametime->get_time();
         delayStartTimer = gametime->get_time();
+        mainTimer = gametime->get_time();
 
         mainTab = menu->create_tab("koreanPings", "KoreanPings");
         pingsSettingsTab = mainTab->add_tab("pingSettings", "Ping settings");
@@ -102,14 +104,15 @@ namespace koreanPings
 
         auto pingAllyNearWardTab = pingsSettingsTab->add_tab("pingAllyNearWard", "Ping ally is near ward");
         {
-            for (auto&& enemy : entitylist->get_enemy_heroes())
+            for (auto&& enemy : entitylist->get_ally_heroes())
             {
                 pings_settings::pingAllyNearWard[enemy->get_network_id()] = pingAllyNearWardTab->add_checkbox(std::to_string(enemy->get_network_id()), enemy->get_model(), true, true);
                 pings_settings::pingAllyNearWard[enemy->get_network_id()]->set_texture(enemy->get_square_icon_portrait());
             }
         }
 
-        pings_settings::pingAllyDistance = pingAllyNearWardTab->add_slider("pingAllyDistance", "Ping ally to ping distance < x", 2000, 100, 20000);
+        pings_settings::pingAllyDistance = pingAllyNearWardTab->add_slider("pingAllyDistance", "Ping ally to ping distance < x", 2000, 100, 4000);
+        pings_settings::pingAllyDistance->set_tooltip("3000 is distance between top pixelbush and top tribush");
 
         pings_settings::pingOnWard = pingsSettingsTab->add_checkbox("pingOnWard", "Ping enemy place ward", true, true);
         pings_settings::pingDelay = pingsSettingsTab->add_slider("pingDelay", "Delay betweend pings (ms)", 400, 100, 1000);
@@ -139,59 +142,117 @@ namespace koreanPings
         }
     }
 
-
-    bool can_ping_fog_on(game_object_script target)
+    bool check_is_target_enabled(game_object_script target, std::map<std::uint32_t, TreeEntry*> elements)
     {
-        auto it = pings_settings::pingMoveOutFog.find(target->get_network_id());
-        if (it == pings_settings::pingMoveOutFog.end())
+        auto it = elements.find(target->get_network_id());
+        if (it == elements.end())
             return false;
 
         return it->second->get_bool();
     }
 
-    void on_update()
-    {
-        if (!pingPackagesVector.empty()) {
-            castLimitedPing();
-        }
+    void ping_ally_close_to_ward() {
 
-        checkNewPingAvailable();
+        auto allies = entitylist->get_ally_heroes();
 
-
-        if (!objectVector.empty()) {
-            auto it = objectVector.begin();
-            while (it != objectVector.end()) {
-                if ((*it)->is_ward() && !(*it)->is_plant()) {
-                    PingPackage pingPackage = PingPackage((*it)->get_position(), 1, _player_ping_type::area_is_warded);
-                    pingPackagesVector.push_back(pingPackage);
-                }
-                it = objectVector.erase(it);
-            }
-        }
-
-        auto enemies = entitylist->get_enemy_heroes();
-
-        for (auto enemy : enemies) {
-
-            std::uint16_t enemyId = enemy->get_network_id();
-
-            if (can_ping_fog_on(enemy)) {
-                if (!enemy->is_visible()) {
-                    invisibleChampions.insert(enemyId);
-                }
-                else {
-                    iterator = invisibleChampions.find(enemyId);
-                    if (iterator != invisibleChampions.end()) {
-                        delayStartTimer = gametime->get_time();
-
-                        PingPackage pingPackage = PingPackage(enemy->get_position(), 1, _player_ping_type::danger);
-                        pingPackagesVector.push_back(pingPackage);
-
-                        invisibleChampions.erase(iterator);
+        for (auto ally : allies) {
+            if (check_is_target_enabled(ally, pings_settings::pingAllyNearWard)) {
+                if (wardNotifier.find(ally->get_network_id()) != wardNotifier.end()) {
+                    std::vector<game_object_script> wards = wardNotifier[ally->get_network_id()];
+                    if (!wards.empty()) {
+                        auto it = wards.begin();
+                        while (it != wards.end()) {
+                            if ((*it)->is_valid()) {
+                                float distance = ally->get_distance(*it);
+                                const char* str = std::to_string(distance).c_str();
+                                console->print(str);
+                                if (distance < pings_settings::pingAllyDistance->get_int()) {
+                                    PingPackage pingPackage = PingPackage((*it)->get_position(), 1, _player_ping_type::area_is_warded);
+                                    pingPackagesVector.push_back(pingPackage);
+                                }
+                            }
+                            it = wards.erase(it);
+                        }
                     }
                 }
             }
         }
-        
+    }
+
+    void search_objects_for_enemy_ward() {
+        if (!objectVector.empty()) {
+            auto it = objectVector.begin();
+            while (it != objectVector.end()) {
+                if ((*it)->is_valid() && (*it)->is_ward() && !(*it)->is_plant() && !(*it)->is_dead()) {
+
+                    auto allies = entitylist->get_ally_heroes();
+
+                    for (auto ally : allies) {
+                        if (check_is_target_enabled(ally, pings_settings::pingAllyNearWard)) {
+                            wardNotifier[ally->get_network_id()].push_back((*it));
+                        }
+                    }
+                    
+                    PingPackage pingPackage = PingPackage((*it)->get_position(), 1, _player_ping_type::area_is_warded);
+                    pingPackagesVector.push_back(pingPackage);
+
+                }
+                it = objectVector.erase(it);
+            }
+        }
+    }
+
+    void search_enemy_move_out_fog() {
+        auto enemies = entitylist->get_enemy_heroes();
+
+        if (!enemies.empty()) {
+            for (auto enemy : enemies) {
+
+                std::uint16_t enemyId = enemy->get_network_id();
+
+                if (check_is_target_enabled(enemy, pings_settings::pingMoveOutFog)) {
+                    if (!enemy->is_visible()) {
+                        invisibleChampions.insert(enemyId);
+                    }
+                    else {
+                        iterator = invisibleChampions.find(enemyId);
+                        if (iterator != invisibleChampions.end()) {
+                            delayStartTimer = gametime->get_time();
+
+                            PingPackage pingPackage = PingPackage(enemy->get_position(), 1, _player_ping_type::danger);
+                            pingPackagesVector.push_back(pingPackage);
+
+                            invisibleChampions.erase(iterator);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void on_update()
+    {
+        float onUpdateTimer = gametime->get_time();
+
+        checkNewPingAvailable();
+
+        if (!pingPackagesVector.empty()) {
+            castLimitedPing();
+        }
+        else if (pingPackagesVector.size() > 6) {
+            console->print_success("USUWAM WSZYSTKIE WARDY");
+            pingPackagesVector.clear();
+        }
+
+        if (onUpdateTimer - mainTimer > 1) {
+            
+            search_objects_for_enemy_ward();
+            search_enemy_move_out_fog();
+            ping_ally_close_to_ward();
+
+            mainTimer = gametime->get_time();
+        }
+
+
     }
 }

@@ -166,6 +166,7 @@
     <ClInclude Include="..\plugin_sdk\plugin_sdk.hpp" />
     <ClInclude Include="KoreanPings.h" />
     <ClInclude Include="PingPackage.h" />
+    <ClInclude Include="WardsNotifier.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
