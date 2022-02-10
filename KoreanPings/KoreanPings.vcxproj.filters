@@ -42,8 +42,5 @@
     <ClInclude Include="PingPackage.h">
       <Filter>src\KoreanPings</Filter>
     </ClInclude>
-    <ClInclude Include="WardsNotifier.h">
-      <Filter>src\KoreanPings</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

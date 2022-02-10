@@ -11,5 +11,4 @@ namespace koreanPings
     void castLimitedPing();
     void on_create_object(game_object_script);
     void on_delete_object(game_object_script);
-    void on_network_packet(game_object_script sender, std::uint32_t network_id, pkttype_e type, void* args);
 };
