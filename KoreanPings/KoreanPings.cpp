@@ -2,7 +2,7 @@
 #include "../plugin_sdk/plugin_sdk.hpp"
 #include "KoreanPings.h"
 #include "PingPackage.h"
-
+#include <random>
 #include <iostream>
 
 namespace koreanPings
@@ -17,6 +17,10 @@ namespace koreanPings
 
     TreeTab* mainTab = nullptr;
     TreeTab* pingsSettingsTab = nullptr;
+
+    std::random_device rd{};
+    auto mtgen = std::mt19937(rd());
+    auto ud = std::uniform_int_distribution<>(-20, 20);
 
     namespace pings_settings
     {
@@ -61,7 +65,8 @@ namespace koreanPings
 
             if (checkCanCastPingDelay()) {
                 PingPackage& firstPing = pingPackagesVector.front();
-                myhero->cast_ping(firstPing.getPosition(), nullptr, firstPing.getPingType());
+                auto position = firstPing.getPosition();
+                myhero->cast_ping(vector(position.x + ud(mtgen), position.y + ud(mtgen), position.z), nullptr, firstPing.getPingType());
                 delayStartTimer = gametime->get_time();
 
                 if (!pingPackagesVector.empty()) {
@@ -123,7 +128,7 @@ namespace koreanPings
     void spamPing()
     {
         for (size_t i = 0; i < 5; i++) {
-            PingPackage pingPackage = PingPackage(myhero->get_position(), _player_ping_type::area_is_warded);
+            PingPackage pingPackage = PingPackage(hud->get_hud_input_logic()->get_game_cursor_position(), _player_ping_type::missing_enemy);
             pingPackagesVector.push_back(pingPackage);
         }
     }
@@ -136,8 +141,10 @@ namespace koreanPings
 
     void on_create_object(game_object_script sender)
     {
-        if (sender->is_valid()) {
-            objectVector.push_back(sender);
+        if (pings_settings::pingOnWard->get_bool()) {
+            if (sender->is_valid()) {
+                objectVector.push_back(sender);
+            }
         }
     }
 
@@ -154,7 +161,14 @@ namespace koreanPings
         if (!objectVector.empty()) {
             auto it = objectVector.begin();
             while (it != objectVector.end()) {
-                if ((*it)->is_valid() && (*it)->is_enemy() && (*it)->is_ward() && !(*it)->is_plant() && !(*it)->is_dead() && !(*it)->is_general_particle_emitter() && (*it)->is_targetable()) {
+                if ((*it)->is_valid() && 
+                    (*it)->is_enemy() && 
+                    (*it)->is_ward() && 
+                    !(*it)->is_plant() && 
+                    !(*it)->is_dead() && 
+                    !(*it)->is_general_particle_emitter() && 
+                    (*it)->is_targetable() && 
+                    !(*it)->is_zombie()) {
                     PingPackage pingPackage = PingPackage((*it)->get_position(), _player_ping_type::area_is_warded);
                     pingPackagesVector.push_back(pingPackage);
                 }
@@ -218,7 +232,9 @@ namespace koreanPings
         }
 
         if (onUpdateTimer - mainTimer > 1) {
-            search_objects_for_enemy_ward();
+            if (pings_settings::pingOnWard->get_bool()) {
+                search_objects_for_enemy_ward();
+            }
             search_enemy_move_out_fog();
             mainTimer = gametime->get_time();
         }
