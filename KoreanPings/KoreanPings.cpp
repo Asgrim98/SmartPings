@@ -117,7 +117,7 @@ namespace koreanPings
         //pings_settings::pingAllyDistance->set_tooltip("3000 is distance between top pixelbush and top tribush");
 
         pings_settings::pingOnWard = pingsSettingsTab->add_checkbox("pingOnWard", "Ping enemy place ward", true, true);
-        pings_settings::pingDelay = pingsSettingsTab->add_slider("pingDelay", "Delay betweend pings (ms)", 400, 100, 1000);
+        pings_settings::pingDelay = pingsSettingsTab->add_slider("pingDelay", "Delay betweend pings (ms)", 400, 30, 1000);
 
         pings_settings::spamPingHotkey = pingsSettingsTab->add_hotkey("spamMissing", "Spam missing pings", TreeHotkeyMode::Hold, 0x41 /*A key*/, false);
 
@@ -168,7 +168,7 @@ namespace koreanPings
                     !(*it)->is_dead() && 
                     !(*it)->is_general_particle_emitter() && 
                     (*it)->is_targetable() && 
-                    !(*it)->is_zombie()) {
+                    ((*it)->get_name() != "Senna_Base_P_Soul_Spawn")) {
                     PingPackage pingPackage = PingPackage((*it)->get_position(), _player_ping_type::area_is_warded);
                     pingPackagesVector.push_back(pingPackage);
                 }
