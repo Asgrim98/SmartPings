@@ -20,13 +20,18 @@ namespace koreanPings
 
     std::random_device rd{};
     auto mtgen = std::mt19937(rd());
-    auto ud = std::uniform_int_distribution<>(-20, 20);
+    auto ud = std::uniform_int_distribution<>(-50, 50);
 
     namespace pings_settings
     {
+        TreeEntry* pingCount = nullptr;
         TreeEntry* pingDelay = nullptr;
+        TreeEntry* wardDistance = nullptr;
         TreeEntry* pingOnWard = nullptr;
-        TreeEntry* spamPingHotkey = nullptr;
+        TreeEntry* spamMissingPingHotkey = nullptr;
+        TreeEntry* spamDangerPingHotkey = nullptr;
+        TreeEntry* spamHelpPingHotkey = nullptr;
+
         TreeEntry* pingEnemyDistance = nullptr;
         std::map<std::uint32_t, TreeEntry*> pingMoveOutFog;
         std::map<std::uint32_t, TreeEntry*> pingAllyNearWard;
@@ -76,7 +81,6 @@ namespace koreanPings
         }
     }
 
-    //TODO handle range to enemy
     void load()
     {
         availablePings = 6;
@@ -102,7 +106,7 @@ namespace koreanPings
         
         
 
-
+        //TODO
         //FOR FUTURE FEATURES
         //auto pingAllyNearWardTab = pingsSettingsTab->add_tab("pingAllyNearWard", "Ping ally is near ward");
         //{
@@ -116,19 +120,30 @@ namespace koreanPings
         //pings_settings::pingAllyDistance = pingAllyNearWardTab->add_slider("pingAllyDistance", "Ping ally to ward distance < x", 2000, 100, 4000);
         //pings_settings::pingAllyDistance->set_tooltip("3000 is distance between top pixelbush and top tribush");
 
-        pings_settings::pingOnWard = pingsSettingsTab->add_checkbox("pingOnWard", "Ping enemy place ward", true, true);
-        pings_settings::pingDelay = pingsSettingsTab->add_slider("pingDelay", "Delay betweend pings (ms)", 400, 30, 1000);
+        auto wardPingSettings = pingsSettingsTab->add_tab("pingOnWard", "Ping enemy place ward");
 
-        pings_settings::spamPingHotkey = pingsSettingsTab->add_hotkey("spamMissing", "Spam missing pings", TreeHotkeyMode::Hold, 0x41 /*A key*/, false);
+        pings_settings::pingOnWard = wardPingSettings->add_checkbox("pingOnWard", "Enabled", true, true);
+        pings_settings::wardDistance = wardPingSettings->add_slider("wardDistance", "Ward to ally range (x)", 500, 0, 1000);
+        pings_settings::wardDistance->set_tooltip("Ping only when no enemies in ward range . Prevent e.g. Lee ward jumps etc.");
+
+        auto spamPingSettings = pingsSettingsTab->add_tab("spamPingSettings", "Ping spam settings");
+
+        pings_settings::spamMissingPingHotkey = spamPingSettings->add_hotkey("spamMissing", "Spam missing pings", TreeHotkeyMode::Hold, 0x47 /*G key*/, false);
+        pings_settings::spamDangerPingHotkey = spamPingSettings->add_hotkey("spamDanger", "Spam danger pings", TreeHotkeyMode::Hold, 0x48 /*H key*/, false);
+        pings_settings::spamHelpPingHotkey = spamPingSettings->add_hotkey("spamHelp", "Spam help pings", TreeHotkeyMode::Hold, 0x4E /*0x4E N key*/, false);
+
+        pings_settings::pingCount = spamPingSettings->add_slider("pingCount", "How many pings", 2, 1, 6);
+
+        pings_settings::pingDelay = pingsSettingsTab->add_slider("pingDelay", "Delay betweend pings (ms)", 400, 30, 1000);
 
         event_handler<events::on_update>::add_callback(on_update);
         event_handler<events::on_create_object>::add_callback(on_create_object);
     }
 
-    void spamPing()
+    void spamPing(_player_ping_type ping_type)
     {
-        for (size_t i = 0; i < 5; i++) {
-            PingPackage pingPackage = PingPackage(hud->get_hud_input_logic()->get_game_cursor_position(), _player_ping_type::missing_enemy);
+        for (size_t i = 0; i < pings_settings::pingCount->get_int(); i++) {
+            PingPackage pingPackage = PingPackage(hud->get_hud_input_logic()->get_game_cursor_position(), ping_type);
             pingPackagesVector.push_back(pingPackage);
         }
     }
@@ -162,13 +177,13 @@ namespace koreanPings
             auto it = objectVector.begin();
             while (it != objectVector.end()) {
                 if ((*it)->is_valid() && 
-                    (*it)->is_enemy() && 
+                    (*it)->is_enemy() &&
                     (*it)->is_ward() && 
                     !(*it)->is_plant() && 
                     !(*it)->is_dead() && 
                     !(*it)->is_general_particle_emitter() && 
-                    (*it)->is_targetable() && 
-                    ((*it)->get_name() != "Senna_Base_P_Soul_Spawn")) {
+                    (*it)->is_targetable_to_team(myhero->get_team()) && 
+                    (*it)->count_allies_in_range(static_cast<float>(pings_settings::wardDistance->get_int())) == 0) {
                     PingPackage pingPackage = PingPackage((*it)->get_position(), _player_ping_type::area_is_warded);
                     pingPackagesVector.push_back(pingPackage);
                 }
@@ -224,9 +239,24 @@ namespace koreanPings
             castLimitedPing();
         }
 
-        if (pings_settings::spamPingHotkey->get_bool()) {
+        //USING TIMER TO PREVENT ACTION PER SECOND
+        if (pings_settings::spamMissingPingHotkey->get_bool()) {
             if (onUpdateTimer - spamPingTimer > 1) {
-                spamPing();
+                spamPing(_player_ping_type::missing_enemy);
+                spamPingTimer = gametime->get_time();
+            }
+        }
+
+        if (pings_settings::spamDangerPingHotkey->get_bool()) {
+            if (onUpdateTimer - spamPingTimer > 1) {
+                spamPing(_player_ping_type::danger);
+                spamPingTimer = gametime->get_time();
+            }
+        }
+
+        if (pings_settings::spamHelpPingHotkey->get_bool()) {
+            if (onUpdateTimer - spamPingTimer > 1) {
+                spamPing(_player_ping_type::assist_me);
                 spamPingTimer = gametime->get_time();
             }
         }
