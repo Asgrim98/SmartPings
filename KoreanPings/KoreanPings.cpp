@@ -185,15 +185,12 @@ namespace koreanPings
                     (*it)->is_enemy() &&
                     (*it)->is_ward() && 
                     !(*it)->is_plant() &&
-
                     !(*it)->is_dead() && 
                     !(*it)->is_general_particle_emitter() && 
                     /*(*it)->is_targetable_to_team(myhero->get_team()) && */
                     (*it)->count_allies_in_range(static_cast<float>(pings_settings::wardDistance->get_int())) == 0 &&
                     ((*it)->get_name() == "JammerDevice" || (*it)->get_name() == "SightWard")
                     ) {
-
-                    consoleWrite((*it)->get_name());
                     PingPackage pingPackage = PingPackage((*it)->get_position(), _player_ping_type::area_is_warded);
                     pingPackagesVector.push_back(pingPackage);
                 }
