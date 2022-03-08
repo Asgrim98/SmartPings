@@ -106,8 +106,8 @@ namespace koreanPings
             }
         }
 
-        pings_settings::pingEnemyDistance = pingMoveOutFogTab->add_slider("pingEnemyDistance", "Ping only when enemy if far than x", 1200, 100, 4000);
-        pings_settings::pingEnemyDistance->set_tooltip("3000 is distance between top pixelbush and top tribush");
+        pings_settings::pingEnemyDistance = pingMoveOutFogTab->add_slider("pingEnemyDistance", "Ping only when no allies in range (x)", 1200, 100, 4000);
+        pings_settings::pingEnemyDistance->set_tooltip("3000 is distance between top pixelbush and top tribush. Use it to avoid pinging in tf's when someone hide in bush.");
         
         
 
@@ -128,8 +128,8 @@ namespace koreanPings
         auto wardPingSettings = pingsSettingsTab->add_tab("pingOnWard", "Ping enemy place ward");
 
         pings_settings::pingOnWard = wardPingSettings->add_checkbox("pingOnWard", "Enabled", true, true);
-        pings_settings::wardDistance = wardPingSettings->add_slider("wardDistance", "Ward to ally range (x)", 500, 0, 1000);
-        pings_settings::wardDistance->set_tooltip("Ping only when no enemies in ward range . Prevent e.g. Lee ward jumps etc.");
+        pings_settings::wardDistance = wardPingSettings->add_slider("wardDistance", "Ward when no allies in range (x)", 500, 0, 1000);
+        pings_settings::wardDistance->set_tooltip("Ping only when no enemies in ward range (x). Prevent e.g. Lee ward jumps etc.");
 
         auto spamPingSettings = pingsSettingsTab->add_tab("spamPingSettings", "Ping spam settings");
 
