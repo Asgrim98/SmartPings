@@ -20,7 +20,7 @@ namespace koreanPings
 
     std::random_device rd{};
     auto mtgen = std::mt19937(rd());
-    auto ud = std::uniform_int_distribution<>(-50, 50);
+    auto ud = std::uniform_int_distribution<>(-80, 80);
 
     namespace pings_settings
     {
@@ -38,6 +38,11 @@ namespace koreanPings
     }
 
     float mainTimer, newPingStartTimer, delayStartTimer, currentTimer, spamPingTimer;
+
+    void consoleWrite(std::string string) {
+        const char* c = string.c_str();
+        console->print(c);
+    }
 
     void checkNewPingAvailable() {
 
@@ -179,11 +184,16 @@ namespace koreanPings
                 if ((*it)->is_valid() && 
                     (*it)->is_enemy() &&
                     (*it)->is_ward() && 
-                    !(*it)->is_plant() && 
+                    !(*it)->is_plant() &&
+
                     !(*it)->is_dead() && 
                     !(*it)->is_general_particle_emitter() && 
-                    (*it)->is_targetable_to_team(myhero->get_team()) && 
-                    (*it)->count_allies_in_range(static_cast<float>(pings_settings::wardDistance->get_int())) == 0) {
+                    /*(*it)->is_targetable_to_team(myhero->get_team()) && */
+                    (*it)->count_allies_in_range(static_cast<float>(pings_settings::wardDistance->get_int())) == 0 &&
+                    ((*it)->get_name() == "JammerDevice" || (*it)->get_name() == "SightWard")
+                    ) {
+
+                    consoleWrite((*it)->get_name());
                     PingPackage pingPackage = PingPackage((*it)->get_position(), _player_ping_type::area_is_warded);
                     pingPackagesVector.push_back(pingPackage);
                 }
@@ -209,8 +219,7 @@ namespace koreanPings
                         iterator = invisibleChampions.find(enemyId);
                         if (iterator != invisibleChampions.end()) {
 
-                            float distance = myhero->get_distance(enemy);
-                            if (distance > pings_settings::pingEnemyDistance->get_int()) {
+                            if ((enemy)->count_allies_in_range(static_cast<float>(pings_settings::pingEnemyDistance->get_int())) == 0) {
                                 delayStartTimer = gametime->get_time();
 
                                 PingPackage pingPackage = PingPackage(enemy->get_position(), _player_ping_type::danger);
