@@ -128,7 +128,7 @@ namespace koreanPings
         auto wardPingSettings = pingsSettingsTab->add_tab("pingOnWard", "Ping enemy place ward");
 
         pings_settings::pingOnWard = wardPingSettings->add_checkbox("pingOnWard", "Enabled", true, true);
-        pings_settings::wardDistance = wardPingSettings->add_slider("wardDistance", "Ward when no allies in range (x)", 500, 0, 1000);
+        pings_settings::wardDistance = wardPingSettings->add_slider("wardDistance", "Ping ward when no allies in range (x)", 500, 0, 1000);
         pings_settings::wardDistance->set_tooltip("Ping only when no enemies in ward range (x). Prevent e.g. Lee ward jumps etc.");
 
         auto spamPingSettings = pingsSettingsTab->add_tab("spamPingSettings", "Ping spam settings");
@@ -188,7 +188,7 @@ namespace koreanPings
                     !(*it)->is_dead() && 
                     !(*it)->is_general_particle_emitter() && 
                     /*(*it)->is_targetable_to_team(myhero->get_team()) && */
-                    (*it)->count_allies_in_range(static_cast<float>(pings_settings::wardDistance->get_int())) == 0 &&
+                    ((*it)->count_enemies_in_range(static_cast<float>(pings_settings::wardDistance->get_int())) == 0) && //OUR TEAM IS ENEMY TO WARD
                     ((*it)->get_name() == "JammerDevice" || (*it)->get_name() == "SightWard")
                     ) {
                     PingPackage pingPackage = PingPackage((*it)->get_position(), _player_ping_type::area_is_warded);
